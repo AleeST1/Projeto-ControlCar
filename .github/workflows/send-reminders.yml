@@ -1,0 +1,24 @@
+name: Send Reminder Notifications
+
+on:
+  schedule:
+    # Executa diariamente às 08:00 America/Sao_Paulo (UTC-3) -> 11:00 UTC
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      daysBefore:
+        description: 'Dias de antecedência (override opcional)'
+        required: false
+        default: '7'
+
+jobs:
+  trigger-function:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call Firebase Function to send reminders
+        env:
+          FUNCTION_URL: ${{ secrets.FUNCTION_URL }}
+          DAYS_BEFORE: ${{ github.event.inputs.daysBefore || '7' }}
+        run: |
+          echo "Calling: ${FUNCTION_URL}?daysBefore=${DAYS_BEFORE}"
+          curl -sSf "${FUNCTION_URL}?daysBefore=${DAYS_BEFORE}" || exit 1

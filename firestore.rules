@@ -1,0 +1,106 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helpers
+    function isMember(list) {
+      return request.auth != null && list != null && request.auth.uid in list;
+    }
+
+    function isInFamily(fid) {
+      return request.auth != null
+        && fid != null
+        && exists(/databases/$(database)/documents/families/$(fid))
+        && request.auth.uid in get(/databases/$(database)/documents/families/$(fid)).data.memberIds;
+    }
+
+    function isFamilyAccess(data) {
+      return data != null && data.familyId != null && isInFamily(data.familyId);
+    }
+
+    function isOwnerAccess(data) {
+      return data != null && data.familyId == null && data.userId == request.auth.uid;
+    }
+
+    // Famílias
+    match /families/{familyId} {
+      // Criar: somente o owner; o owner deve estar na lista de membros enviada
+      allow create: if request.auth != null
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.memberIds != null
+        && request.auth.uid in request.resource.data.memberIds;
+
+      // Ler: membros atuais
+      allow read: if isMember(resource.data.memberIds);
+
+      // Atualizar: membros atuais ou estado proposto
+      allow update: if isMember(resource.data.memberIds)
+        || isMember(request.resource.data.memberIds);
+
+      // Excluir: somente o owner atual
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Índice público de convites (código curto -> familyId)
+    match /familyInvites/{code} {
+      // Ler: qualquer usuário autenticado pode resolver um código
+      allow read: if request.auth != null;
+      // Criar/atualizar/excluir: apenas o owner da família cria ou rotaciona códigos
+      allow create: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow update: if request.auth != null && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
+    }
+
+    // Veículos (familiares ou pessoais)
+    match /vehicles/{docId} {
+      allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
+      allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+      allow update: if request.auth != null && (
+        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
+        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+      );
+      allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+    }
+
+    // Abastecimentos
+    match /fuelings/{docId} {
+      allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
+      allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+      allow update: if request.auth != null && (
+        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
+        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+      );
+      allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+    }
+
+    // Manutenções (lembretes)
+    match /maintenances/{docId} {
+      allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
+      allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+      allow update: if request.auth != null && (
+        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
+        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+      );
+      allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+    }
+
+    // Viagens
+    match /trips/{docId} {
+      allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
+      allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+      allow update: if request.auth != null && (
+        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
+        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+      );
+      allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
+    }
+
+    // Tokens de notificação (por usuário)
+    match /notificationTokens/{token} {
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read:   if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
+  }
+}

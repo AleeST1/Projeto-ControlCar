@@ -1,0 +1,36 @@
+name: Send Reminders (Script)
+
+on:
+  schedule:
+    # Executa diariamente às 08:00 America/Sao_Paulo (UTC-3) -> 11:00 UTC
+    - cron: '0 11 * * *'
+  workflow_dispatch:
+    inputs:
+      daysBefore:
+        description: 'Dias de antecedência (override opcional)'
+        required: false
+        default: '7'
+
+jobs:
+  run-script:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'pnpm'
+        - run: corepack enable
+        - run: pnpm install --dir functions --frozen-lockfile
+        - env:
+            FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+          run: pnpm --dir functions run send-reminders
+        env:
+          FIREBASE_SERVICE_ACCOUNT_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          DAYS_BEFORE="${{ github.event.inputs.daysBefore || '7' }}"
+          echo "Running sendReminders.js with DAYS_BEFORE=${DAYS_BEFORE}"
+          node functions/sendReminders.js "${DAYS_BEFORE}"
