@@ -5,6 +5,30 @@ import { registerFcmToken, removeFcmToken } from './firestore'
 const vapidKey = import.meta.env.VITE_FIREBASE_VAPID_KEY
 const FCM_SW_SCOPE = '/firebase-cloud-messaging-push-scope'
 
+async function waitForActive(reg, timeoutMs = 8000) {
+  if (reg?.active) return reg
+  const worker = reg.installing || reg.waiting
+  if (worker) {
+    await new Promise((resolve) => {
+      const onChange = () => {
+        if (worker.state === 'activated') resolve()
+      }
+      worker.addEventListener('statechange', onChange)
+      if (worker.state === 'activated') resolve()
+    })
+  } else {
+    await new Promise((resolve) => {
+      const start = Date.now()
+      const tick = () => {
+        if (reg.active || Date.now() - start > timeoutMs) return resolve()
+        setTimeout(tick, 150)
+      }
+      tick()
+    })
+  }
+  return reg
+}
+
 export async function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) throw new Error('Service Worker não suportado')
   const params = new URLSearchParams({
@@ -15,7 +39,6 @@ export async function registerServiceWorker() {
     appId: import.meta.env.VITE_FIREBASE_APP_ID || '',
   })
 
-  // Sempre garantir um SW dedicado para FCM, com escopo próprio para evitar conflito com o SW do PWA
   const registrations = await navigator.serviceWorker.getRegistrations()
   let fcmReg = registrations.find((r) => (r?.scope || '').endsWith(`${FCM_SW_SCOPE}/`))
 
@@ -23,6 +46,8 @@ export async function registerServiceWorker() {
     fcmReg = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${params.toString()}`, { scope: FCM_SW_SCOPE })
   }
 
+  await fcmReg.update().catch(() => {})
+  await waitForActive(fcmReg)
   return fcmReg
 }
 

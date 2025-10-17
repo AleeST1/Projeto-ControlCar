@@ -14,6 +14,8 @@ const Trips = lazy(() => import('./pages/Trips.jsx'))
 const Family = lazy(() => import('./pages/Family.jsx'))
 const Documents = lazy(() => import('./pages/Documents.jsx'))
 const Fines = lazy(() => import('./pages/Fines.jsx'))
+const Notifications = lazy(() => import('./pages/Notifications.jsx'))
+const Settings = lazy(() => import('./pages/Settings.jsx'))
 
 export default function App() {
   const location = useLocation()
@@ -27,6 +29,8 @@ export default function App() {
   const [clock, setClock] = useState(new Date())
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const userMenuRef = useRef(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const mobileMenuRef = useRef(null)
   const pageTitleMap = {
     '/': 'Dashboard',
     '/vehicles': 'Veículos',
@@ -35,6 +39,8 @@ export default function App() {
     '/trips': 'Viagens',
     '/documents': 'Documentos',
     '/fines': 'Multas',
+    '/notifications': 'Notificações',
+    '/settings': 'Configurações',
   }
   const currentTitle = pageTitleMap[location.pathname] || 'ControlCar'
   
@@ -47,29 +53,32 @@ export default function App() {
       window.removeEventListener('offline', update)
     }
   }, [])
-
+  
   // Toasts de conectividade
   useEffect(() => {
     addToast({ type: online ? 'success' : 'error', message: online ? 'Conexão restaurada' : 'Sem conexão — modo offline' })
   }, [online, addToast])
-
+  
   // Relógio no cabeçalho
   useEffect(() => {
     const timer = setInterval(() => setClock(new Date()), 1000)
     return () => clearInterval(timer)
   }, [])
-
+  
   // Fecha o menu do usuário ao clicar fora
   useEffect(() => {
     function handleClickOutside(e) {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setUserMenuOpen(false)
       }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target)) {
+        setMobileMenuOpen(false)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
-
+  
   // Atalhos de teclado Ctrl+1..4
   useEffect(() => {
     function onKey(e) {
@@ -142,7 +151,7 @@ export default function App() {
       </aside>
       
       <div className="flex-1 flex flex-col">
-        <header className="bg-dark-200 shadow-nav px-6 py-4 flex items-center justify-between sticky top-0 z-30">
+        <header className="bg-dark-200 shadow-nav px-6 py-4 flex items-center justify-between sticky top-0 z-30 topbar-solid-mobile">
           <div className="flex items-center">
             <h1 className="text-xl font-bold tracking-tight text-white sm:hidden">ControlCar</h1>
             <h1 className="text-xl font-bold tracking-tight text-white hidden sm:block">{currentTitle}</h1>
@@ -178,23 +187,17 @@ export default function App() {
                     </button>
 
                     {userMenuOpen && (
-                      <div className="absolute right-0 top-9 min-w-[180px] rounded-lg bg-dark-100 border border-dark-200 shadow-lg p-1 z-50">
+                      <div className="absolute right-0 top-9 min-w-[180px] rounded-lg bg-dark-100 border border-dark-200 shadow-lg p-1 z-50 user-menu-dropdown">
                         <button
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md"
-                          onClick={() => {
-                            setUserMenuOpen(false)
-                            addToast({ type: 'info', message: 'Configurações em breve' })
-                          }}
+                          onClick={() => { setUserMenuOpen(false); navigate('/settings') }}
                         >
                           <span className="material-icons text-sm">settings</span>
                           <span>Configurações</span>
                         </button>
                         <button
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md"
-                          onClick={() => {
-                            setUserMenuOpen(false)
-                            addToast({ type: 'info', message: 'Notificações em breve' })
-                          }}
+                          onClick={() => { setUserMenuOpen(false); navigate('/notifications') }}
                         >
                           <span className="material-icons text-sm">notifications</span>
                           <span>Notificações</span>
@@ -202,10 +205,7 @@ export default function App() {
                         <div className="border-t border-dark-200 my-1"></div>
                         <button
                           className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md"
-                          onClick={() => {
-                            setUserMenuOpen(false)
-                            signOut(auth)
-                          }}
+                          onClick={() => { setUserMenuOpen(false); signOut(auth) }}
                         >
                           <span className="material-icons text-sm">logout</span>
                           <span>Sair</span>
@@ -214,9 +214,34 @@ export default function App() {
                     )}
                   </div>
                 )}
-                <button className="sm:hidden w-8 h-8 flex items-center justify-center rounded-full bg-dark-100">
-                  <span className="material-icons text-sm">account_circle</span>
-                </button>
+                <div className="sm:hidden relative" ref={mobileMenuRef}>
+                  <button
+                    className="w-8 h-8 flex items-center justify-center rounded-full bg-dark-100"
+                    aria-haspopup="menu"
+                    aria-expanded={mobileMenuOpen}
+                    onClick={() => setMobileMenuOpen((v) => !v)}
+                    title={auth?.currentUser?.displayName || auth?.currentUser?.email || 'Menu'}
+                  >
+                    <span className="material-icons text-sm">account_circle</span>
+                  </button>
+                  {mobileMenuOpen && (
+                    <div className="absolute right-0 top-10 min-w-[160px] rounded-lg bg-dark-100 border border-dark-200 shadow-lg p-1 z-50 mobile-menu-dropdown">
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md" onClick={() => { setMobileMenuOpen(false); navigate('/settings') }}>
+                        <span className="material-icons text-sm">settings</span>
+                        <span>Configurações</span>
+                      </button>
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md" onClick={() => { setMobileMenuOpen(false); navigate('/notifications') }}>
+                        <span className="material-icons text-sm">notifications</span>
+                        <span>Notificações</span>
+                      </button>
+                      <div className="border-t border-dark-200 my-1"></div>
+                      <button className="w-full flex items-center gap-2 px-3 py-2 text-sm text-secondary-200 hover:bg-dark-300 rounded-md" onClick={() => { setMobileMenuOpen(false); signOut(auth) }}>
+                        <span className="material-icons text-sm">logout</span>
+                        <span>Sair</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
                 {/* Seletor de tema e relógio removidos do cabeçalho */}
               </>
             ) : (
@@ -245,6 +270,8 @@ export default function App() {
               <Route path="/fines" element={<Fines />} />
               <Route path="/trips" element={<Trips />} />
               <Route path="/family" element={<Family />} />
+              <Route path="/notifications" element={<Notifications />} />
+              <Route path="/settings" element={<Settings />} />
             </Routes>
           </Suspense>
         </main>
@@ -417,7 +444,7 @@ function Home() {
 
   return (
     <div className="space-y-6 animate-fadeIn animate-slideUp">
-      <div className="glass-card p-6 rounded-2xl mb-8">
+      <div className="glass-card p-4 sm:p-6 rounded-2xl mb-6 sm:mb-8">
         <h2 className="text-2xl font-bold text-white mb-2">Olá, {userName} 👋</h2>
         <p className="text-secondary-300">Pronto para gerenciar seus veículos hoje?</p>
       </div>
@@ -426,8 +453,13 @@ function Home() {
         <Summary title="Veículos" value={vehicles.length} icon="garage" color="from-blue-500 to-blue-700" loading={loading} />
         <Summary title="Abastecimentos" value={fuelings.length} icon="local_gas_station" color="from-green-500 to-green-700" loading={loading} />
         <Summary title="Manutenções pendentes" value={pendingReminders} icon="event" color="from-purple-500 to-purple-700" loading={loading} />
-        <Summary title="Preço médio/L" value={`R$ ${avgPricePerLiter.toFixed(2)}`} icon="attach_money" color="from-amber-500 to-amber-700" loading={loading} trend={trendUp} />
-        <Summary title="Viagens" value={plannedTrips} icon="map" color="from-indigo-500 to-indigo-700" loading={loading} />
+        {/* Secundários: escondidos no mobile */}
+        <div className="hidden sm:block">
+          <Summary title="Preço médio/L" value={`R$ ${avgPricePerLiter.toFixed(2)}`} icon="attach_money" color="from-amber-500 to-amber-700" loading={loading} trend={trendUp} />
+        </div>
+        <div className="hidden sm:block">
+          <Summary title="Viagens" value={plannedTrips} icon="map" color="from-indigo-500 to-indigo-700" loading={loading} />
+        </div>
       </div>
 
       <h3 className="text-lg font-medium text-secondary-200 mb-4">Acesso rápido</h3>
@@ -460,18 +492,20 @@ function Home() {
           titleAttr="Ir para tela de manutenções"
           loading={loading}
         />
-        <Card 
-          title="Viagens" 
-          to="/trips" 
-          icon="map"
-          description="Planeje e acompanhe custos das viagens"
-          color="bg-gradient-to-br from-amber-500 to-amber-700"
-          titleAttr="Ir para tela de viagens"
-          loading={loading}
-        />
+        <div className="hidden sm:block">
+          <Card 
+            title="Viagens" 
+            to="/trips" 
+            icon="map"
+            description="Planeje e acompanhe custos das viagens"
+            color="bg-gradient-to-br from-amber-500 to-amber-700"
+            titleAttr="Ir para tela de viagens"
+            loading={loading}
+          />
+        </div>
       </div>
 
-      <div className="mt-8 p-4 rounded-xl tip-banner">
+      <div className="mt-8 p-4 rounded-xl tip-banner hidden sm:block">
         <h3 className="text-sm font-medium text-secondary-200 mb-2 flex items-center gap-2">
           <span className="material-icons text-primary-400 text-base">tips_and_updates</span>
           <span>Dica</span>
@@ -479,8 +513,7 @@ function Home() {
         <p className="text-xs text-secondary-200">{tips[tipIndex]}</p>
       </div>
 
-      {/* Métricas detalhadas */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="hidden sm:grid sm:grid-cols-2 gap-5">
         <div className="glass-card rounded-2xl p-5">
           <div className="flex items-center gap-2 mb-2">
             <span className="material-icons text-primary-400">trending_up</span>
@@ -499,8 +532,7 @@ function Home() {
         </div>
       </div>
 
-      {/* Próximas manutenções e últimos abastecimentos */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+      <div className="hidden sm:grid sm:grid-cols-2 gap-5">
         <div className="glass-card rounded-2xl p-5">
           <h3 className="text-sm font-medium text-secondary-200 mb-3 flex items-center gap-2"><span className="material-icons text-base text-secondary-300">event_upcoming</span> Próximas manutenções</h3>
           {upcomingReminders.length === 0 ? (
@@ -540,7 +572,6 @@ function Home() {
         </div>
       </div>
 
-      {/* Gráficos simples */}
       {!!vehicles.length && (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           <div className="glass-card rounded-2xl p-5">
@@ -666,7 +697,7 @@ function StatusBadge({ online, syncEnabled, realtimeSubscribed, lastSyncAt, vari
         <span className="flex items-center gap-1 whitespace-nowrap">
           <span className={`w-2 h-2 rounded-full ${syncStatusColor} ${realtimeSubscribed ? 'animate-pulse' : ''}`}></span>
           <span className={`material-icons text-[14px] ${syncEnabled ? (realtimeSubscribed ? 'text-primary-400' : 'text-yellow-400') : 'text-secondary-500'}`}>cloud</span>
-          <span>{syncEnabled ? (realtimeSubscribed ? `Sincronizado (${time})` : 'Sincronizando...') : 'Sincronização desativada'}</span>
+          <span>{syncEnabled ? (realtimeSubscribed ? `Sincronizado (${time})` : 'Sincronizando...') : 'Sincronizão desativada'}</span>
         </span>
       </div>
     )
@@ -694,7 +725,7 @@ function StatusBadge({ online, syncEnabled, realtimeSubscribed, lastSyncAt, vari
                     <span className="text-secondary-400 text-[10px]">{time}</span>
                   </span> 
                 : 'Sincronizando...')
-            : 'Sincronização desativada'}
+            : 'Sincronizão desativada'}
         </span>
       </div>
     </div>

@@ -9,6 +9,7 @@ const DAYS_BEFORE = Number(process.env.REMINDER_DAYS_BEFORE || '7')
 admin.initializeApp()
 const db = admin.firestore()
 
+// Inside: async function runReminderJob(daysBefore = DAYS_BEFORE) {
 async function runReminderJob(daysBefore = DAYS_BEFORE) {
   try {
     const tokensSnap = await db.collection('notificationTokens').get()
@@ -82,6 +83,19 @@ async function runReminderJob(daysBefore = DAYS_BEFORE) {
           data: { url: '/maintenances' },
         })
         logger.info(`Notificação enviada para ${userId}`, { success: resp.successCount, failure: resp.failureCount })
+
+        // NEW: remove tokens that failed with 'registration-token-not-registered'
+        const invalidTokens = []
+        resp.responses?.forEach((r, idx) => {
+          const code = r.error?.code || ''
+          if (code === 'messaging/registration-token-not-registered') {
+            invalidTokens.push(tokens[idx])
+          }
+        })
+        if (invalidTokens.length) {
+          await Promise.all(invalidTokens.map((t) => db.collection('notificationTokens').doc(t).delete()))
+          logger.info('Tokens inválidos removidos', { count: invalidTokens.length })
+        }
       } catch (e) {
         logger.error('Erro ao enviar FCM', e)
       }
@@ -91,11 +105,26 @@ async function runReminderJob(daysBefore = DAYS_BEFORE) {
   }
 }
 
-exports.sendReminderNotifications = onSchedule({ schedule: 'every day 08:00', timeZone: 'America/Sao_Paulo' }, async (event) => {
+// Top-level export: sendReminderNotifications
+exports.sendReminderNotifications = onSchedule({ schedule: '0 8 * * *', timeZone: 'America/Sao_Paulo' }, async (event) => {
   await runReminderJob()
 })
 
+async function requireAuth(req) {
+  const authHeader = req.headers.authorization || ''
+  const token = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : null
+  if (!token) throw new Error('unauthorized')
+  const decoded = await admin.auth().verifyIdToken(token)
+  // Opcional: restringir a lista de UIDs permitidos ou checar custom claim (decoded.admin === true)
+  return decoded
+}
+
 exports.sendReminderNotificationsNow = onRequest(async (req, res) => {
+  try {
+    await requireAuth(req)
+  } catch (e) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' })
+  }
   let days = Number(req.query.daysBefore || req.query.days || DAYS_BEFORE)
   if (!Number.isFinite(days) || days < 0 || days > 365) {
     days = DAYS_BEFORE
@@ -104,10 +133,13 @@ exports.sendReminderNotificationsNow = onRequest(async (req, res) => {
   res.json({ ok: true, daysBefore: days })
 })
 
-// Migração: copia documentos de 'reminders' para 'maintenances'
 exports.migrateRemindersToMaintenances = onRequest(async (req, res) => {
   try {
-    const remSnap = await db.collection('reminders').get()
+    await requireAuth(req)
+  } catch (e) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' })
+  }
+  const remSnap = await db.collection('reminders').get()
     const batch = db.batch()
     remSnap.forEach((doc) => {
       batch.set(db.collection('maintenances').doc(doc.id), doc.data())
@@ -123,16 +155,21 @@ exports.migrateRemindersToMaintenances = onRequest(async (req, res) => {
       deleted = remSnap.size
     }
     res.json({ migrated: remSnap.size, deleted })
+    try {
   } catch (e) {
     logger.error('Falha na migração reminders -> maintenances', e)
     res.status(500).json({ ok: false, error: e.message })
   }
-})
+}),
 
 // Seed: cria uma manutenção de teste com dueDate em 7 dias para cada usuário com token
 exports.seedMaintenanceTest = onRequest(async (req, res) => {
   try {
-    const tokensSnap = await db.collection('notificationTokens').get()
+    await requireAuth(req)
+  } catch (e) {
+    return res.status(403).json({ ok: false, error: 'Forbidden' })
+  }
+  const tokensSnap = await db.collection('notificationTokens').get()
     const users = new Set()
     tokensSnap.forEach((doc) => {
       const data = doc.data()
@@ -162,6 +199,7 @@ exports.seedMaintenanceTest = onRequest(async (req, res) => {
     }
     await batch.commit()
     res.json({ ok: true, users: users.size, created })
+    try {
   } catch (e) {
     logger.error('Falha no seed de manutenções de teste', e)
     res.status(500).json({ ok: false, error: e.message })

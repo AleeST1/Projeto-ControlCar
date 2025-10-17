@@ -19,7 +19,7 @@ export default function FilterBar({
           <label className="flex flex-col gap-1.5 text-sm">
             <span className="text-secondary-300">Filtrar por veículo</span>
             <select
-              className="rounded-lg border border-dark-100 bg-dark-300 px-3 py-2 text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+              className="rounded-lg border border-dark-100 bg-dark-700 px-3 py-2 text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
               value={vehicleValue ?? ''}
               onChange={(e) => onVehicleChange(e.target.value)}
             >

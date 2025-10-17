@@ -15,10 +15,12 @@
 
   messaging.onBackgroundMessage((payload) => {
     const title = payload?.notification?.title || 'Manutenção do veículo'
+    const url = payload?.data?.url || payload?.fcmOptions?.link || '/maintenances'
     const options = {
       body: payload?.notification?.body || 'Você tem uma manutenção pendente.',
-      icon: '/vite.svg',
-      data: payload?.data || {},
+      icon: '/icons/controlcar-192.png',
+      badge: '/icons/controlcar-192.png', // Android badge
+      data: { url },
     }
     self.registration.showNotification(title, options)
   })
@@ -34,6 +36,15 @@
   self.addEventListener('notificationclick', (event) => {
     event.notification.close()
     const url = event.notification?.data?.url || '/maintenances'
-    event.waitUntil(self.clients.openWindow(url))
+    event.waitUntil((async () => {
+      const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const absolute = new URL(url, self.location.origin).href
+      for (const client of allClients) {
+        if (client.url === absolute && 'focus' in client) {
+          return client.focus()
+        }
+      }
+      return self.clients.openWindow(url)
+    })())
   })
 })()

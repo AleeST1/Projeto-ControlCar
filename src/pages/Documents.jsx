@@ -56,7 +56,7 @@ export default function Documents() {
       <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
         <label className="text-sm text-secondary-200 flex flex-col gap-1">
           <span>Tipo</span>
-          <select className="rounded-lg border border-dark-100 bg-dark-500 px-3 py-2 text-secondary-100" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
+          <select className="rounded-lg border border-dark-100 bg-dark-700 px-3 py-2 text-secondary-100" value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}>
             {types.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}

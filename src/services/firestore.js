@@ -14,14 +14,14 @@ function randomIndex(max) {
   }
   return Math.floor(Math.random() * max)
 }
-function generateInviteCode(length = 7) {
+function generateInviteCode(length = 10) {
   let code = ''
   for (let i = 0; i < length; i++) {
     code += INVITE_ALPHABET[randomIndex(INVITE_ALPHABET.length)]
   }
   return code
 }
-async function ensureUniqueInviteCode(length = 7, maxAttempts = 6) {
+async function ensureUniqueInviteCode(length = 10, maxAttempts = 6) {
   // Verifica unicidade usando o índice público de convites (familyInvites),
   // que possui leitura liberada para usuários autenticados pelas regras.
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -257,11 +257,11 @@ export async function getUserFamily(userId) {
 
 // Família: entrar via código (familyId)
 export async function joinFamily(codeOrId, userId) {
-  const input = (codeOrId || '').trim()
+  const input = (codeOrId || '').trim().toUpperCase()
   let resolvedFamilyId = null
   let targetDocRef = null
 
-  // Se parece um UUID (contém hífens ou é bem longo), trata como ID direto
+  // Removido: entrada por ID direto (UUID). Exigir sempre código curto.
   if (input.includes('-') || input.length > 20) {
     resolvedFamilyId = input
     targetDocRef = doc(db, 'families', resolvedFamilyId)

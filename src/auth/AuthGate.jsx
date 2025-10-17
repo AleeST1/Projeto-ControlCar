@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { auth, isFirebaseConfigured } from '../firebase'
-import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile } from 'firebase/auth'
+import { onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, sendPasswordResetEmail, updateProfile, GoogleAuthProvider, signInWithPopup } from 'firebase/auth'
 import { useAppStore } from '../store/appStore'
 import { isFirestoreEnabled, loadAllForScope, subscribeScopeCollections, getUserFamily } from '../services/firestore'
-import { getNotificationStatus, enableNotifications, registerServiceWorker } from '../services/messaging'
+import { getNotificationStatus, enableNotifications, registerServiceWorker, disableNotifications } from '../services/messaging'
 
 export default function AuthGate({ children }) {
   const [user, setUser] = useState(null)
@@ -41,6 +41,9 @@ export default function AuthGate({ children }) {
       setUser(u)
       setCurrentUser(u)
       if (!u) {
+        try {
+          await disableNotifications().catch(() => {})
+        } catch {}
         resetAll()
         setSyncEnabled(false)
         setRealtimeSubscribed(false)
@@ -135,6 +138,20 @@ export default function AuthGate({ children }) {
       setInfo('Enviamos um email com instruções para redefinir sua senha.')
     } catch (err) {
       setError(err.message || 'Não foi possível enviar o email de recuperação.')
+    }
+  }
+
+  async function handleGoogleSignIn() {
+    setError('')
+    setInfo('')
+    setSubmitting(true)
+    try {
+      const provider = new GoogleAuthProvider()
+      await signInWithPopup(auth, provider)
+    } catch (err) {
+      setError(err.message || 'Falha no login com Google')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -283,6 +300,15 @@ export default function AuthGate({ children }) {
           </button>
           <button
             type="button"
+            className="w-full px-4 py-2.5 rounded-lg border border-red-400 text-red-400 hover:bg-red-500/10 mt-2 flex items-center justify-center gap-2"
+            onClick={handleGoogleSignIn}
+            disabled={submitting}
+          >
+            <img src="https://www.svgrepo.com/show/475656/google-color.svg" alt="Google" className="w-5 h-5" style={{ display: 'inline-block' }} />
+            <span className="mx-auto">Entrar com Google</span>
+          </button>
+          <button
+            type="button"
             className="w-full px-4 py-2.5 rounded-lg border border-sky-400 text-sky-400 hover:bg-sky-500/10"
             onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}
           >
@@ -295,3 +321,5 @@ export default function AuthGate({ children }) {
 
   return children
 }
+
+

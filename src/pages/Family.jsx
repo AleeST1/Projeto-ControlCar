@@ -89,7 +89,7 @@ export default function Family() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="Ex: Família Rinaldi"
+                placeholder="Ex: Família João"
               />
             </label>
             <button

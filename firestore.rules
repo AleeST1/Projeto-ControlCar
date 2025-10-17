@@ -2,7 +2,6 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helpers
     function isMember(list) {
       return request.auth != null && list != null && request.auth.uid in list;
     }
@@ -22,7 +21,11 @@ service cloud.firestore {
       return data != null && data.familyId == null && data.userId == request.auth.uid;
     }
 
-    // Famílias
+    // Novo helper para prevenir mudanças de escopo (userId/familyId)
+    function sameScope(oldData, newData) {
+      return oldData.userId == newData.userId && oldData.familyId == newData.familyId;
+    }
+
     match /families/{familyId} {
       // Criar: somente o owner; o owner deve estar na lista de membros enviada
       allow create: if request.auth != null
@@ -33,9 +36,15 @@ service cloud.firestore {
       // Ler: membros atuais
       allow read: if isMember(resource.data.memberIds);
 
-      // Atualizar: membros atuais ou estado proposto
-      allow update: if isMember(resource.data.memberIds)
-        || isMember(request.resource.data.memberIds);
+      // Atualizar: membros atuais OU estado proposto (para permitir auto-entrada via código),
+      // mas bloqueando alterações indevidas de ownerId ou inviteCode
+      allow update: if (
+        isMember(resource.data.memberIds) ||
+        isMember(request.resource.data.memberIds)
+      ) && (
+        request.resource.data.ownerId == resource.data.ownerId &&
+        request.resource.data.inviteCode == resource.data.inviteCode
+      );
 
       // Excluir: somente o owner atual
       allow delete: if request.auth != null && resource.data.ownerId == request.auth.uid;
@@ -56,8 +65,9 @@ service cloud.firestore {
       allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
       allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
       allow update: if request.auth != null && (
-        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
-        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+        (isFamilyAccess(resource.data) || isOwnerAccess(resource.data)) &&
+        (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)) &&
+        sameScope(resource.data, request.resource.data)
       );
       allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
     }
@@ -67,8 +77,9 @@ service cloud.firestore {
       allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
       allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
       allow update: if request.auth != null && (
-        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
-        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+        (isFamilyAccess(resource.data) || isOwnerAccess(resource.data)) &&
+        (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)) &&
+        sameScope(resource.data, request.resource.data)
       );
       allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
     }
@@ -78,8 +89,9 @@ service cloud.firestore {
       allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
       allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
       allow update: if request.auth != null && (
-        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
-        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+        (isFamilyAccess(resource.data) || isOwnerAccess(resource.data)) &&
+        (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)) &&
+        sameScope(resource.data, request.resource.data)
       );
       allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
     }
@@ -89,8 +101,9 @@ service cloud.firestore {
       allow create: if request.auth != null && (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data));
       allow read:   if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
       allow update: if request.auth != null && (
-        isFamilyAccess(resource.data) || isOwnerAccess(resource.data) ||
-        isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)
+        (isFamilyAccess(resource.data) || isOwnerAccess(resource.data)) &&
+        (isFamilyAccess(request.resource.data) || isOwnerAccess(request.resource.data)) &&
+        sameScope(resource.data, request.resource.data)
       );
       allow delete: if request.auth != null && (isFamilyAccess(resource.data) || isOwnerAccess(resource.data));
     }

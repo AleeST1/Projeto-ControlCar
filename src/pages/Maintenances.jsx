@@ -1,8 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import EmptyState from '../components/EmptyState'
 import { useAppStore } from '../store/appStore'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { enableNotifications, disableNotifications, getNotificationStatus } from '../services/messaging'
 import PageHeader from '../components/PageHeader'
 import FilterBar from '../components/FilterBar'
 
@@ -10,115 +9,70 @@ export default function Maintenances() {
   const vehicles = useAppStore((s) => s.vehicles)
   const addReminder = useAppStore((s) => s.addReminder)
   const addToast = useAppStore((s) => s.addToast)
-  const currentUserId = useAppStore((s) => s.currentUserId)
   const [form, setForm] = useState({ vehicleId: '', description: '', dueDate: '', repeatEveryDays: '', priority: 'medium' })
   const [submitting, setSubmitting] = useState(false)
-  const [{ permission, hasToken }, setNotif] = useState({ permission: typeof Notification !== 'undefined' ? Notification.permission : 'default', hasToken: !!localStorage.getItem('fcmToken') })
-
-  useEffect(() => {
-    setNotif(getNotificationStatus())
-  }, [])
-
   function handleSubmit(e) {
     e.preventDefault()
-    if (!form.vehicleId || !form.dueDate || !form.description) {
+    if (!form.vehicleId || !form.description.trim()) {
+      addToast({ type: 'error', message: 'Preencha veículo e descrição' })
       return
     }
     setSubmitting(true)
     try {
       addReminder({
         vehicleId: form.vehicleId,
-        type: 'maintenance',
         description: form.description.trim(),
-        dueDate: new Date(form.dueDate).toISOString(),
-        dueMileage: null,
+        dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : null,
         repeatEveryDays: form.repeatEveryDays ? Number(form.repeatEveryDays) : null,
         priority: form.priority || 'medium',
       })
       setForm({ vehicleId: '', description: '', dueDate: '', repeatEveryDays: '', priority: 'medium' })
-      addToast({ type: 'success', message: 'Manutenção adicionada com sucesso' })
+      addToast({ type: 'success', message: 'Manutenção adicionada' })
     } catch (err) {
       console.error('Erro ao adicionar manutenção:', err)
-      addToast({ type: 'error', message: 'Erro ao adicionar manutenção' })
+      addToast({ type: 'error', message: 'Falha ao adicionar manutenção' })
     } finally {
       setSubmitting(false)
     }
   }
-
-  async function toggleNotifications() {
-    try {
-      if (hasToken) {
-        await disableNotifications()
-        setNotif(getNotificationStatus())
-        addToast({ type: 'success', message: 'Notificações desativadas' })
-      } else {
-        await enableNotifications(currentUserId)
-        setNotif(getNotificationStatus())
-        addToast({ type: 'success', message: 'Notificações ativadas' })
-      }
-    } catch (e) {
-      addToast({ type: 'error', message: e?.message || 'Falha ao atualizar notificações' })
-    }
-  }
+  // REMOVIDO: estado [{ permission, hasToken }, setNotif]
+  // REMOVIDO: useEffect(() => setNotif(getNotificationStatus()), [])
+  // REMOVIDO: function toggleNotifications()
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Manutenções" subtitle="Receba avisos próximos do vencimento e gerencie suas manutenções.">
-        <button
-          className={`px-3 py-1.5 rounded-lg text-sm shadow-sm ${hasToken ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-primary-600 text-white hover:bg-primary-700'}`}
-          onClick={toggleNotifications}
-        >
-          {hasToken ? 'Desativar notificações' : 'Ativar notificações'}
-        </button>
-      </PageHeader>
-
-      <section id="add-maintenance" className="space-y-3">
-        <h3 className="text-lg font-medium">Cadastrar manutenção</h3>
-        <form className="glass-card rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-3 gap-3" onSubmit={handleSubmit}>
-          <Select
-            label="Veículo"
-            value={form.vehicleId}
-            required
-            onChange={(v) => setForm((f) => ({ ...f, vehicleId: v }))}
-            options={[{ value: '', label: 'Selecione' }, ...vehicles.map((v) => ({ value: v.vehicleId, label: `${v.model} ${v.plate}` }))]}
-          />
-          <Input
-            label="Descrição"
-            value={form.description}
-            required
-            onChange={(v) => setForm((f) => ({ ...f, description: v }))}
-          />
-          <Input
-            label="Data"
-            type="date"
-            value={form.dueDate}
-            required
-            onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))}
-          />
-          <Input
-            label="Repetir a cada (dias)"
-            type="number"
-            value={form.repeatEveryDays}
-            onChange={(v) => setForm((f) => ({ ...f, repeatEveryDays: v }))}
-          />
-          <Select
-            label="Prioridade"
-            value={form.priority}
-            onChange={(v) => setForm((f) => ({ ...f, priority: v }))}
-            options={[
-              { value: 'low', label: 'Baixa' },
-              { value: 'medium', label: 'Média' },
-              { value: 'high', label: 'Alta' },
-            ]}
-          />
-          <div className="sm:col-span-3">
-            <button className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60" disabled={submitting}>
-              {submitting ? 'Adicionando…' : 'Adicionar manutenção'}
-            </button>
-          </div>
-        </form>
-      </section>
-
+      <PageHeader
+        title="Manutenções"
+        subtitle="Receba avisos próximos do vencimento e gerencie suas manutenções."
+      />
+      <form id="add-maintenance" onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <Select
+          label="Veículo"
+          value={form.vehicleId}
+          onChange={(v) => setForm((f) => ({ ...f, vehicleId: v }))}
+          options={[{ value: '', label: 'Selecione um veículo' }, ...vehicles.map((v) => ({ value: v.vehicleId, label: v.name || `${v.model ?? ''} ${v.year ?? ''} — ${v.plate ?? ''}`.trim() }))]}
+          required
+        />
+        <Input label="Descrição" value={form.description} onChange={(v) => setForm((f) => ({ ...f, description: v }))} required />
+        <Input label="Data (opcional)" type="date" value={form.dueDate} onChange={(v) => setForm((f) => ({ ...f, dueDate: v }))} />
+        <Input label="Repete a cada (dias)" type="number" value={form.repeatEveryDays} onChange={(v) => setForm((f) => ({ ...f, repeatEveryDays: v }))} />
+        <Select
+          label="Prioridade"
+          value={form.priority}
+          onChange={(v) => setForm((f) => ({ ...f, priority: v }))}
+          options={[
+            { value: 'low', label: 'Baixa' },
+            { value: 'medium', label: 'Média' },
+            { value: 'high', label: 'Alta' },
+          ]}
+          required
+        />
+        <div className="sm:col-span-2">
+          <button className="px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 disabled:opacity-60" disabled={submitting}>
+            {submitting ? 'Salvando…' : 'Adicionar manutenção'}
+          </button>
+        </div>
+      </form>
       <MaintenanceList />
     </div>
   )
@@ -141,65 +95,63 @@ function MaintenanceList() {
     <div className="space-y-3">
       <h3 className="text-lg font-medium">Agendadas</h3>
       <FilterBar
-        vehicleOptions={[{ value: '', label: 'Todos' }, ...vehicles.map((v) => ({ value: v.vehicleId, label: `${v.model} ${v.plate}` }))]}
+        vehicleOptions={[{ value: '', label: 'Todos' }, ...vehicles.map((v) => ({ value: v.vehicleId, label: v.name || v.model || v.plate || v.vehicleId }))]}
         vehicleValue={filterVehicleId}
         onVehicleChange={setFilterVehicleId}
-        actions={(
+        actions={
           <>
             <button className="px-3 py-1.5 rounded-lg bg-dark-200 border border-dark-300 text-xs hover:bg-dark-300" onClick={() => exportMaintenancesCSV(list, vehicles)}>Exportar CSV</button>
             <button className="px-3 py-1.5 rounded-lg bg-dark-200 border border-dark-300 text-xs hover:bg-dark-300" onClick={() => exportMaintenancesXLS(list, vehicles)}>Exportar Excel</button>
           </>
-        )}
+        }
       />
-
       {list.length === 0 && (
         <EmptyState
-          icon="event"
+          icon="build"
           title="Nenhuma manutenção cadastrada"
-          description="Cadastre manutenções por data e receba avisos próximos do vencimento."
+          description="Adicione sua primeira manutenção para receber avisos de vencimento."
           actionText="Adicionar manutenção"
           to="#add-maintenance"
         />
       )}
-
       {list.map((r) => {
         const v = vehicles.find((vv) => vv.vehicleId === r.vehicleId)
         const dueDateLabel = r.dueDate ? new Date(r.dueDate).toLocaleDateString('pt-BR') : '—'
         const overdue = r.dueDate ? new Date(r.dueDate) < new Date() : false
         return (
-          <div key={r.reminderId} className="glass-card rounded-2xl p-5 flex items-center justify-between gap-3">
-            <div className="flex flex-col">
+          <div key={r.reminderId} className="glass-card rounded-2xl p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3">
+            <div className="flex flex-col flex-1 min-w-0">
               <div className="flex items-center gap-2">
-                <div className="font-medium text-white">{r.description}</div>
+                <div className="font-medium text-white break-words">{r.description}</div>
                 {r.priority && (
                   <span className={`px-2 py-0.5 rounded text-[11px] ${r.priority === 'high' ? 'bg-red-600 text-white' : r.priority === 'medium' ? 'bg-yellow-500 text-black' : 'bg-secondary-600 text-white'}`}>{r.priority === 'high' ? 'Alta' : r.priority === 'medium' ? 'Média' : 'Baixa'}</span>
                 )}
               </div>
               <div className="text-xs text-secondary-300">{v ? `${v.model} ${v.plate}` : 'Veículo'} • Data: {dueDateLabel} {r.repeatEveryDays ? `• Repete a cada ${r.repeatEveryDays}d` : ''}</div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 sm:gap-2 w-full sm:w-auto mt-2 sm:mt-0">
               <button
-                className={`px-3 py-1.5 rounded-lg text-sm shadow-sm transition-colors ${r.isCompleted ? 'bg-green-600 text-white hover:bg-green-700' : overdue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-yellow-500 text-black hover:bg-yellow-600'}`}
+                className={`px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm shadow-sm transition-colors ${r.isCompleted ? 'bg-green-600 text-white hover:bg-green-700' : overdue ? 'bg-red-600 text-white hover:bg-red-700' : 'bg-yellow-500 text-black hover:bg-yellow-600'}`}
                 onClick={() => { toggleReminder(r.reminderId); addToast({ type: 'success', message: 'Manutenção atualizada' }) }}
               >
                 {r.isCompleted ? 'Concluída' : overdue ? 'Atrasada' : 'Pendente'}
               </button>
-              <button className="px-3 py-1.5 rounded-lg text-sm bg-dark-200 text-white hover:bg-dark-300 border border-dark-300" onClick={() => { snoozeReminder(r.reminderId, 7); addToast({ type: 'success', message: 'Adiado por 7 dias' }) }}>Adiar 7d</button>
+              <button className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm bg-dark-200 text-white hover:bg-dark-300 border border-dark-300" onClick={() => { snoozeReminder(r.reminderId, 7); addToast({ type: 'success', message: 'Adiado por 7 dias' }) }}>Adiar 7d</button>
               <select
-                className="px-2 py-1 rounded-lg text-sm bg-dark-200 text-white border border-dark-300"
-                value={r.priority || 'medium'}
-                onChange={(e) => { updateReminder(r.reminderId, { priority: e.target.value }); addToast({ type: 'success', message: 'Prioridade atualizada' }) }}
+                className="rounded-lg border border-dark-100 bg-dark-700 px-3 py-2 text-white focus:border-primary-500 focus:ring-1 focus:ring-primary-500 outline-none"
+                value={value}
+                required={required}
+                onChange={(e) => onChange(e.target.value)}
               >
-                <option value="low">Baixa</option>
-                <option value="medium">Média</option>
-                <option value="high">Alta</option>
+                {options.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
               </select>
-              <button className="px-3 py-1.5 rounded-lg text-sm bg-red-600 text-white hover:bg-red-700 shadow-sm" onClick={() => setConfirmDeleteId(r.reminderId)}>Remover</button>
+              <button className="px-2 sm:px-3 py-1 sm:py-1.5 rounded-lg text-xs sm:text-sm bg-red-600 text-white hover:bg-red-700 shadow-sm" onClick={() => setConfirmDeleteId(r.reminderId)}>Remover</button>
             </div>
           </div>
         )
       })}
-
       <ConfirmDialog
         open={!!confirmDeleteId}
         title="Confirmar exclusão"
